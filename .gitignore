@@ -1,36 +1,61 @@
-# Python bytecode
+# ── Python bytecode ───────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *$py.class
 
-# Virtual environments
+# ── Virtual environment (uv-managed) ─────────────────────────────────────────
 .venv/
 venv/
 env/
 ENV/
 
-# Build and packaging
+# ── Build and packaging ───────────────────────────────────────────────────────
 build/
 dist/
 *.egg-info/
 .eggs/
 
-# Test and coverage
+# ── Test and coverage ─────────────────────────────────────────────────────────
 .pytest_cache/
 .coverage
 htmlcov/
 
-# Tool caches
+# ── Tool caches ───────────────────────────────────────────────────────────────
 .mypy_cache/
 .ruff_cache/
 .ipynb_checkpoints/
+.cache/
 
-# Local runtime outputs
+# ── Secrets / local config ────────────────────────────────────────────────────
+.env
+# (keep .env.example — it has no secrets)
+
+# ── Runtime outputs & logs ────────────────────────────────────────────────────
 outputs/
 log/
+logs/
 *.log
+uploads/
 
-# OS and editor files
+# ── Temporary PDF conversion dirs ─────────────────────────────────────────────
+/tmp/pdf_ocr_*/
+
+# ── Model weights & HuggingFace cache ────────────────────────────────────────
+# Avoid accidentally committing downloaded model shards (~7-14 GB)
+models/
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.gguf
+# HF hub cache (if pointed inside the repo)
+.huggingface/
+
+# ── Large binary assets (>50 MB) ─────────────────────────────────────────────
+# The demo GIF is 82 MB — too large for standard GitHub
+assets/long-horizon-ocr.gif
+
+# ── OS and editor files ───────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 .vscode/
