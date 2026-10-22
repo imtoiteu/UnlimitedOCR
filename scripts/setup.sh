@@ -87,7 +87,7 @@ else
 fi
 
 uv pip install \
-    "transformers>=4.51.0" \
+    "transformers==4.57.1" \
     "Pillow>=10.0.0" \
     "einops>=0.8.0" \
     "addict>=2.4.0" \

@@ -1,0 +1,148 @@
+diff --git aa/modeling_unlimitedocr.py bb/modeling_unlimitedocr.py
+index 68f5f32..ad9d3b6 100644
+--- aa/modeling_unlimitedocr.py
++++ bb/modeling_unlimitedocr.py
+@@ -578,7 +578,7 @@ class UnlimitedOCRModel(DeepseekV2Model):
+                     images_in_this_batch = torch.cat(images_in_this_batch, dim=0)
+                     # exit()
+ 
+-                    inputs_embeds[idx].masked_scatter_(images_seq_mask[idx].unsqueeze(-1).cuda(), images_in_this_batch)
++                    inputs_embeds[idx].masked_scatter_(images_seq_mask[idx].unsqueeze(-1).to(next(self.parameters()).device), images_in_this_batch)
+ 
+                 idx += 1
+             
+@@ -878,9 +878,9 @@ class UnlimitedOCRForCausalLM(DeepseekV2ForCausalLM):
+                 # elif base_size == 640:
+                 #     valid_img_tokens += int(100 * ratio)
+                 
+-                images_list.append(image_transform(global_view).to(torch.bfloat16))
++                images_list.append(image_transform(global_view).to(torch.bfloat16 if torch.cuda.is_available() else torch.float32))
+ 
+-                # global_view_tensor = image_transform(global_view).to(torch.bfloat16)
++                # global_view_tensor = image_transform(global_view).to(torch.bfloat16 if torch.cuda.is_available() else torch.float32)
+ 
+                 width_crop_num, height_crop_num = crop_ratio
+ 
+@@ -891,7 +891,7 @@ class UnlimitedOCRForCausalLM(DeepseekV2ForCausalLM):
+                     """process the local views"""
+                     
+                     for i in range(len(images_crop_raw)):
+-                        images_crop_list.append(image_transform(images_crop_raw[i]).to(torch.bfloat16))
++                        images_crop_list.append(image_transform(images_crop_raw[i]).to(torch.bfloat16 if torch.cuda.is_available() else torch.float32))
+                 
+                 if image_size == 640:
+                     valid_img_tokens += len(images_crop_list) * 100
+@@ -925,7 +925,7 @@ class UnlimitedOCRForCausalLM(DeepseekV2ForCausalLM):
+                 # else:
+                 global_view = ImageOps.pad(image, (image_size, image_size),
+                                         color=tuple(int(x * 255) for x in image_transform.mean))
+-                images_list.append(image_transform(global_view).to(torch.bfloat16))
++                images_list.append(image_transform(global_view).to(torch.bfloat16 if torch.cuda.is_available() else torch.float32))
+ 
+                 if base_size == 1024:
+                     valid_img_tokens += int(256 * ratio)
+@@ -995,9 +995,9 @@ class UnlimitedOCRForCausalLM(DeepseekV2ForCausalLM):
+             self.config.sliding_window = None
+             # Build logits processors for ngram
+             gen_kwargs = dict(
+-                input_ids=input_ids.unsqueeze(0).cuda(),
+-                images=[(images_crop.cuda(), images_ori.cuda())],
+-                images_seq_mask=images_seq_mask.unsqueeze(0).cuda(),
++                input_ids=input_ids.unsqueeze(0).to(next(self.parameters()).device),
++                images=[(images_crop.to(next(self.parameters()).device), images_ori.to(next(self.parameters()).device))],
++                images_seq_mask=images_seq_mask.unsqueeze(0).to(next(self.parameters()).device),
+                 images_spatial_crop=images_spatial_crop,
+                 do_sample=temperature > 0,
+                 temperature=temperature if temperature > 0 else None,
+@@ -1010,7 +1010,7 @@ class UnlimitedOCRForCausalLM(DeepseekV2ForCausalLM):
+                 gen_kwargs['logits_processor'] = [SlidingWindowNoRepeatNgramProcessor(no_repeat_ngram_size, ngram_window)]
+             elif no_repeat_ngram_size > 0:
+                 gen_kwargs['no_repeat_ngram_size'] = no_repeat_ngram_size
+-            with torch.autocast("cuda", dtype=torch.bfloat16):
++            with torch.autocast("cuda", dtype=torch.bfloat16, enabled=torch.cuda.is_available()):
+                 with torch.no_grad():
+                     output_ids = self.generate(**gen_kwargs)
+             self.config.sliding_window = _orig_sw
+@@ -1020,9 +1020,9 @@ class UnlimitedOCRForCausalLM(DeepseekV2ForCausalLM):
+             self.config._ring_window = _orig_sw
+             self.config.sliding_window = None
+             gen_kwargs = dict(
+-                input_ids=input_ids.unsqueeze(0).cuda(),
+-                images=[(images_crop.cuda(), images_ori.cuda())],
+-                images_seq_mask=images_seq_mask.unsqueeze(0).cuda(),
++                input_ids=input_ids.unsqueeze(0).to(next(self.parameters()).device),
++                images=[(images_crop.to(next(self.parameters()).device), images_ori.to(next(self.parameters()).device))],
++                images_seq_mask=images_seq_mask.unsqueeze(0).to(next(self.parameters()).device),
+                 images_spatial_crop=images_spatial_crop,
+                 do_sample=temperature > 0,
+                 temperature=temperature if temperature > 0 else None,
+@@ -1034,14 +1034,14 @@ class UnlimitedOCRForCausalLM(DeepseekV2ForCausalLM):
+                 gen_kwargs['logits_processor'] = [SlidingWindowNoRepeatNgramProcessor(no_repeat_ngram_size, ngram_window)]
+             elif no_repeat_ngram_size > 0:
+                 gen_kwargs['no_repeat_ngram_size'] = no_repeat_ngram_size
+-            with torch.autocast("cuda", dtype=torch.bfloat16):
++            with torch.autocast("cuda", dtype=torch.bfloat16, enabled=torch.cuda.is_available()):
+                 with torch.no_grad():
+                     output_ids = self.generate(**gen_kwargs)
+             self.config.sliding_window = _orig_sw
+                 
+ 
+         if '<image>' in conversation[0]['content'] and eval_mode:
+-                outputs = tokenizer.decode(output_ids[0, input_ids.unsqueeze(0).cuda().shape[1]:])
++                outputs = tokenizer.decode(output_ids[0, input_ids.unsqueeze(0).to(next(self.parameters()).device).shape[1]:])
+                 stop_str = '<｜end▁of▁sentence｜>'
+                 if outputs.endswith(stop_str):
+                     outputs = outputs[:-len(stop_str)]
+@@ -1051,7 +1051,7 @@ class UnlimitedOCRForCausalLM(DeepseekV2ForCausalLM):
+                 return outputs
+         
+         if '<image>' in conversation[0]['content'] and test_compress:
+-            outputs = tokenizer.decode(output_ids[0, input_ids.unsqueeze(0).cuda().shape[1]:])
++            outputs = tokenizer.decode(output_ids[0, input_ids.unsqueeze(0).to(next(self.parameters()).device).shape[1]:])
+             pure_texts_outputs_token_length = len(text_encode(tokenizer, outputs, bos=False, eos=False))
+             print('='*50)
+             print('image size: ', (w, h))
+@@ -1062,7 +1062,7 @@ class UnlimitedOCRForCausalLM(DeepseekV2ForCausalLM):
+ 
+ 
+         if '<image>' in conversation[0]['content'] and save_results:
+-            outputs = tokenizer.decode(output_ids[0, input_ids.unsqueeze(0).cuda().shape[1]:])
++            outputs = tokenizer.decode(output_ids[0, input_ids.unsqueeze(0).to(next(self.parameters()).device).shape[1]:])
+             stop_str = '<｜end▁of▁sentence｜>'
+ 
+             print('='*15 + 'save results:' + '='*15)
+@@ -1197,7 +1197,7 @@ class UnlimitedOCRForCausalLM(DeepseekV2ForCausalLM):
+             global_view = ImageOps.pad(image, (image_size, image_size),
+                                       color=tuple(int(x * 255) for x in image_transform.mean))
+ 
+-            images_list.append(image_transform(global_view).to(torch.bfloat16))
++            images_list.append(image_transform(global_view).to(torch.bfloat16 if torch.cuda.is_available() else torch.float32))
+             images_spatial_crop.append([1, 1])
+ 
+             # Image tokens for this image (same structure as single-image non-crop mode)
+@@ -1230,12 +1230,12 @@ class UnlimitedOCRForCausalLM(DeepseekV2ForCausalLM):
+         _orig_sw = getattr(self.config, 'sliding_window_size', None) or getattr(self.config, 'sliding_window', None)
+         self.config._ring_window = _orig_sw  # Save for ring buffer to read
+         self.config.sliding_window = None
+-        with torch.autocast("cuda", dtype=torch.bfloat16):
++        with torch.autocast("cuda", dtype=torch.bfloat16, enabled=torch.cuda.is_available()):
+             with torch.no_grad():
+                 gen_kwargs = dict(
+-                    input_ids=input_ids.unsqueeze(0).cuda(),
+-                    images=[(dummy_crop.cuda(), images_ori.cuda())],
+-                    images_seq_mask=images_seq_mask.unsqueeze(0).cuda(),
++                    input_ids=input_ids.unsqueeze(0).to(next(self.parameters()).device),
++                    images=[(dummy_crop.to(next(self.parameters()).device), images_ori.to(next(self.parameters()).device))],
++                    images_seq_mask=images_seq_mask.unsqueeze(0).to(next(self.parameters()).device),
+                     images_spatial_crop=images_spatial_crop,
+                     do_sample=temperature > 0,
+                     temperature=temperature if temperature > 0 else None,
+@@ -1251,7 +1251,7 @@ class UnlimitedOCRForCausalLM(DeepseekV2ForCausalLM):
+                 output_ids = self.generate(**gen_kwargs)
+         self.config.sliding_window = _orig_sw  # Restore
+ 
+-        outputs = tokenizer.decode(output_ids[0, input_ids.unsqueeze(0).cuda().shape[1]:])
++        outputs = tokenizer.decode(output_ids[0, input_ids.unsqueeze(0).to(next(self.parameters()).device).shape[1]:])
+         stop_str = '<｜end▁of▁sentence｜>'
+         if outputs.endswith(stop_str):
+             outputs = outputs[:-len(stop_str)]
